@@ -148,11 +148,8 @@ class PhetServer {
 		$data = $this->parseRequest( $input );
 
 		foreach ( $this->modules as $name => &$module ) {
-			try {
+			if ( method_exists( $module, 'run' ) )
 				$module->run( $data, $client, $this );
-			} catch ( Exception $error ) {
-				$this->log( 'Error in module ' . $name . ': ' . $error->getMessage() );
-			}
 		}
 		unset( $input, $data, $module, $name );
 	}
