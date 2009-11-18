@@ -233,8 +233,9 @@ class PhetServer {
 		$sent = 0;
 		$length = strlen( $body );
 		while ( $length > $sent ) {
-			$buffer = substr( $body, $sent, 1024 );
-			$success = @socket_write( $client->socket, $buffer, strlen( $buffer ) );
+			$success = @socket_write( $client->socket,
+				substr( $body, $sent, 1024 ),
+				1024 > ( $length - $sent ) ? $length - $sent : 1024 );
 
 			if ( false !== $success )
 				$sent += $success;
@@ -243,7 +244,7 @@ class PhetServer {
 				break;
 			}
 		}
-		unset( $sent, $length, $success, $buffer );
+		unset( $sent, $length, $success );
 	}
 	
 	public function readFromClient( &$client ) {
