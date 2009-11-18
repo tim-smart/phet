@@ -10,6 +10,7 @@
 
 class PhetServer {
 	public $host = 'localhost';
+	public $webhost = 'localhost';
 	public $port = 54321;
 	public $maxClients = 20;
 
@@ -71,10 +72,10 @@ class PhetServer {
 
 			// Re-add client sockets to read list
 			reset( $this->clients );
-			foreach ( $this->clients as $client )
+			foreach ( $this->clients as $i => &$client )
 				if ( NULL !== $client->socket )
-					$this->sockets[] = $client->socket;
-			unset( $client );
+					$this->sockets[ $i + 1 ] = &$client->socket;
+			unset( $client, $i );
 
 			// Pause execution until we have activity.
 			$count = socket_select( $this->sockets, $null, $null, $null );
@@ -116,7 +117,7 @@ class PhetServer {
 				}
 
 				// Do we have other stuff to deal with?
-				if ( 1 < (int)$count ) {
+				if ( 1 >= $count ) {
 					unset( $count );
 					continue;
 				}
@@ -128,7 +129,6 @@ class PhetServer {
 
 			// Recieving data!
 			$keys = array_keys( $this->sockets );
-			reset( $keys );
 			foreach ( $keys as $key ) {
 				$key = $key - 1;
 
@@ -223,7 +223,7 @@ class PhetServer {
 					$this->writeToClient( $client, $message );
 		
 		} else {
-			foreach( $this->clients as $id => &$client )
+			foreach( $this->clients as &$client )
 				$this->writeToClient( $client, $message );
 		}
 		unset( $client, $id );
@@ -233,7 +233,8 @@ class PhetServer {
 		$sent = 0;
 		$length = strlen( $body );
 		while ( $length > $sent ) {
-			$success = @socket_write( $client->socket, substr( $body, $sent, 1024 ), 1024 );
+			$buffer = substr( $body, $sent, 1024 );
+			$success = @socket_write( $client->socket, $buffer, strlen( $buffer ) );
 
 			if ( false !== $success )
 				$sent += $success;
@@ -242,7 +243,7 @@ class PhetServer {
 				break;
 			}
 		}
-		unset( $sent, $length, $success );
+		unset( $sent, $length, $success, $buffer );
 	}
 	
 	public function readFromClient( &$client ) {

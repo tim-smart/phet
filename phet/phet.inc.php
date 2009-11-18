@@ -13,6 +13,7 @@ include_once 'modules/default.module.php';
 // Create server instance
 $phet = new PhetServer();
 $phet->host = PHET_HOST;
+$phet->webHost = PHET_WEBHOST;
 $phet->port = PHET_PORT;
 $phet->maxClients = PHET_MAXCLIENTS;
 

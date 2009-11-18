@@ -8,6 +8,11 @@ class PhetModuleDefault {
 		if ( 'js' === $data['GET']['module'] ) {
 			$client->send('HTTP/1.1 200 OK' . "\r\n" . 'Content-Type: application/x-javascript' . "\r\n\r\n" . file_get_contents( PHET_DIR . 'js/phet.js') );
 			$server->disconnectClient( $client );
+		} else if ( 'iframe' === $data['GET']['module'] ) {
+			$client->send( 'HTTP/1.1 200 OK' . "\r\n" .
+				'Content-Type: application/x-javascript' . "\r\n\r\n" .
+				'<script type="text/javascript">' .
+				'document.domain = "' . $server->webHost . '";</script>' );
 		}
 	}
 }
