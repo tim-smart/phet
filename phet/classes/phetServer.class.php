@@ -62,9 +62,8 @@ class PhetServer {
 		// A placeholder for NULL
 		$null = NULL;
 
+		socket_set_block( $this->socket );
 		while ( $this->running ) {
-			socket_set_block( $this->socket );
-
 			// Reset sockets read list
 			unset( $this->sockets );
 			$this->sockets = array();
@@ -72,10 +71,10 @@ class PhetServer {
 
 			// Re-add client sockets to read list
 			reset( $this->clients );
-			foreach ( $this->clients as $i => &$client )
+			foreach ( $this->clients as &$client )
 				if ( NULL !== $client->socket )
-					$this->sockets[ $i + 1 ] = &$client->socket;
-			unset( $client, $i );
+					$this->sockets[ $client->id + 1 ] = &$client->socket;
+			unset( $client );
 
 			// Pause execution until we have activity.
 			$count = socket_select( $this->sockets, $null, $null, $null );
