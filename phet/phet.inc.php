@@ -8,6 +8,7 @@ require_once 'classes/phetClient.class.php';
 
 // Default Modules
 include_once 'modules/admin.module.php';
+include_once 'modules/default.module.php';
 
 // Create server instance
 $phet = new PhetServer();
@@ -16,6 +17,7 @@ $phet->port = PHET_PORT;
 $phet->maxClients = PHET_MAXCLIENTS;
 
 // Register default modules
+$phet->registerModule('PhetModuleDefault');
 $phet->registerModule('PhetModuleAdmin');
 
 ?>

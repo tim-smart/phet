@@ -99,6 +99,16 @@ class PhetServer {
 
 							// Log it!
 							$this->log('Client #' . $i . ' connected');
+
+							// Run any hooks
+							foreach ( $this->modules as &$module ) {
+								if ( method_exists( $module, 'onClientConnect' ) ) {
+									try {
+										$module->onClientConnect( $this->clients[ $i ], $this );
+									} catch ( Exception $error ) {}
+								}
+							}
+							unset( $module );
 							break;
 						}
 					}
@@ -257,7 +267,9 @@ class PhetServer {
 			$input = $input . $buffer;
 		}
 		unset( $buffer );
-		
+
+		socket_set_block( $client->socket );
+
 		if ( '' !== $input )
 			return $input;
 		else
@@ -280,7 +292,15 @@ class PhetServer {
 		$client->disconnect();
 		$this->log( 'Client #' . $client->id . ' disconnected.' );
 
-		unset( $this->clients[ $client->id ] );
+		foreach ( $this->modules as &$module ) {
+			if ( method_exists( $module, 'onClientDisconnect' ) ) {
+				try {
+					$module->onClientDisconnect( $client, $this );
+				} catch ( Exception $error ) {}
+			}
+		}
+
+		unset( $this->clients[ $client->id ], $module );
 	}
 }
 

@@ -39,7 +39,11 @@ class PhetModuleAdmin {
 				break;
 		}
 
-		unset( $input );
+		// Send a message to other clients
+		if ( preg_match( '/send:(.*)/', $input, $match ) )
+			$server->send( $match[1] . "\n" );
+
+		unset( $input, $match );
 	}
 
 	private function disconnect( &$client, &$server ) {
