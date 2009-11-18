@@ -1,7 +1,7 @@
-# . Welcome to the phet PHP Comet Server
+# Welcome to the phet PHP Comet Server
 This server utilises the socket functionality of PHP to create a scalable PHP Comet server.
 
-## . Usage
+## Usage
 Have a look at example.php to see the most basic usage. You can extend phet by registering modules with a server instance.
 Achieve this buy creating a class with the method `run`. You can then use the servers `registerModule` method to register the module with the server. E.g.
 
