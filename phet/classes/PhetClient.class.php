@@ -17,9 +17,7 @@ class PhetClient {
 	private $data = array();
 	private $server;
 
-	function __construct( $id, &$server ) {
-		$this->id = $id;
-		$this->server = &$server;
+	function __construct( &$server, $id ) {
 	}
 
 	public function get( $key, $default = NULL ) {
@@ -41,7 +39,7 @@ class PhetClient {
 		socket_getpeername( $this->socket, $this->ipAddress );
 	}
 
-	public function send( $body ) {
+	public function write( $body ) {
 		$this->server->writeToClient( $this, $body );
 	}
 

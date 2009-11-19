@@ -9,10 +9,14 @@
  */
 
 class PhetServer {
-	public $host = 'localhost';
-	public $webhost = 'localhost';
-	public $port = 7438;
-	public $maxClients = 20;
+	public $host;
+	public $port;
+
+	protected $socket;
+
+	public function __construct( $host, $port ) {
+		// Connect to $host:$port
+	}
 
 	public function run() {
 		
