@@ -5,9 +5,9 @@ define( 'PHET_WEBHOST', 'localhost' );
 define( 'PHET_PORT', 7438 );
 define( 'PHET_MAXCLIENTS', 50 );
 
-define( 'PHET_ADMIN_USER', 'admin' );
-define( 'PHET_ADMIN_PASSWORD', 'password' );
+define( 'MEMCACHE_HOST', 'localhost' );
+define( 'MEMCACHE_PORT', 11211 );
 
-define( 'PHET_DIR', '/path/to/phet/server/' );
+define( 'PHET_DIR', '/home/tim/Projects/sites/phet/' );
 
 ?>
