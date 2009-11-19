@@ -214,9 +214,9 @@ class PhetServer {
 					$this->writeToClient( $client, $message );
 
 		} else if ( is_array( $whitelist ) ) {
-			foreach( $this->clients as $id => &$client )
-				if ( in_array( $id, $whitelist ) )
-					$this->writeToClient( $client, $message );
+			foreach( $whitelist as $id )
+				if ( isset( $this->clients[ $id ] ) )
+					$this->writeToClient( $this->clients[ $id ], $message );
 		
 		} else {
 			foreach( $this->clients as &$client )
@@ -229,9 +229,7 @@ class PhetServer {
 		$sent = 0;
 		$length = strlen( $body );
 		while ( $length > $sent ) {
-			$success = @socket_write( $client->socket,
-				substr( $body, $sent, 1024 ),
-				1024 > ( $length - $sent ) ? $length - $sent : 1024 );
+			$success = @socket_write( $client->socket, substr( $body, $sent ), $length - $sent );
 
 			if ( false !== $success )
 				$sent += $success;
@@ -255,10 +253,8 @@ class PhetServer {
 			if ( false === $buffer )
 				break;
 			else if ( '' === $buffer ) {
-				$client->disconnect();
-				$this->log( 'Client #' . $client->id . ' exited' );
-
-				unset( $buffer, $this->clients[ $client->id ] );
+				$this->disconnectClient( $client );
+				unset( $buffer );
 				return false;
 			}
 
@@ -275,6 +271,11 @@ class PhetServer {
 	}
 
 	public function stop() {
+		foreach ( $this->modules as $name => &$module ) {
+			if ( method_exists( $module, 'onServerDisconnect' ) )
+				$module->onServerDisconnect( $this );
+		}
+
 		$this->running = false;
 
 		socket_shutdown( $this->socket, 1 );

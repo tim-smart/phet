@@ -6,8 +6,8 @@ var Phet = function() {
 };
 
 Phet.prototype = {
-	host: '',
-	port: 54321,
+	host: '<?php echo $host; ?>',
+	port: <?php echo $port; ?>,
 	_listeners: [],
 	_queue: [],
 	_current: null,
@@ -17,7 +17,7 @@ Phet.prototype = {
 	start: function() {
 		document.domain = this.host;
 
-		this._iframe.src = 'http://' + this.host + ':' + this.port + '/?module=iframe';
+		this._iframe.src = 'http://' + this.host + ':' + this.port + '/?module=iframe&tmp=' + new Date().getTime();
 		document.body.appendChild( this._iframe );
 	},
 	send: function( body ) {
