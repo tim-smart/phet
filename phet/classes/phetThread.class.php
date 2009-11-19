@@ -1,0 +1,7 @@
+<?php
+
+final class PhetThread {
+	
+}
+
+?>

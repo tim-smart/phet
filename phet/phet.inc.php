@@ -1,10 +1,12 @@
 <?php
 
-//Load config and such
+// Load config and such
 require_once 'config.inc.php';
 
-require_once 'classes/phetServer.class.php';
-require_once 'classes/phetClient.class.php';
+function __autoload( $className ) {
+	if ( file_exists( 'classes/' . $className . '.class.php' ) )
+		require 'classes/' . $className . '.class.php';
+}
 
 // Default Modules
 include_once 'modules/admin.module.php';
