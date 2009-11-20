@@ -9,43 +9,37 @@
  */
 
 class PhetClient {
-	public $socket;
-	public $ipAddress;
-	public $id;
+	private $socket;
+	private $handle;
+	private $request;
+	public $info = array();
 
-	private $active = true;
-	private $data = array();
-	private $server;
-
-	function __construct( &$server, $id ) {
+	function __construct( &$socket ) {
+		$this->socket = &$socket;
 	}
 
-	public function get( $key, $default = NULL ) {
-		if ( isset( $this->data[ $key] ) )
-			return $this->data[ $key ];
-		else
-			return $default;
-	}
+	public function read() {
+		socket_set_nonblock( $this->socket );
 
-	public function set( $key, $value ) {
-		$this->data[ $key ] = $value;
-	}
+		$buffer = NULL;
+		$input = '';
 
-	public function isActive() {
-		return $this->active;
-	}
+		while ( true ) {
+			$buffer = @socket_read( $this->socket, 1024 );
 
-	public function retrieveInfo() {
-		socket_getpeername( $this->socket, $this->ipAddress );
-	}
+			if ( false === $buffer || '' === $buffer )
+				break;
 
-	public function write( $body ) {
-		$this->server->writeToClient( $this, $body );
+			$input = $input . $buffer;
+		}
+		unset( $buffer );
+
+		return $input;
 	}
 
 	public function disconnect() {
+		socket_shutdown( $this->socket, 2 );
 		socket_close( $this->socket );
-		$this->active = false;
 	}
 }
 

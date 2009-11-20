@@ -3,19 +3,19 @@
 // Load config and such
 require_once 'config.inc.php';
 
-function __autoload( $className ) {
-	if ( file_exists( 'classes/' . $className . '.class.php' ) )
-		require 'classes/' . $className . '.class.php';
-}
+require 'classes/PhetHandler.class.php';
+require 'classes/PhetServer.class.php';
+require 'classes/PhetClient.class.php';
+require 'classes/Thread.class.php';
+require 'classes/PhetClientThread.class.php';
 
-// Default Modules
-include_once 'modules/admin.module.php';
-include_once 'modules/default.module.php';
-
-$phet = new PhetHandler();
-
-// Register default modules
-$phet->registerModule('PhetModuleDefault');
-$phet->registerModule('PhetModuleAdmin');
+// phet is a instance of PhetHandler
+$phet = new PhetHandler( array(
+	'host'			=>	PHET_HOST,
+	'port'			=>	PHET_PORT,
+	'maxClients'	=>	PHET_MAXCLIENTS,
+	'cache_host'	=>	MEMCACHE_HOST,
+	'cache_port'	=>	MEMCACHE_PORT
+) );
 
 ?>

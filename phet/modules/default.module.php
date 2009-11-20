@@ -1,9 +1,13 @@
 <?php
 
-class PhetModuleDefault {
-	public function run( $data, &$client, &$server ) {
-		if ( empty( $data['HEAD'] ) || empty( $data['GET']['module'] ) )
-			return;
+class PhetModuleDefault implements iPhetModule {
+	public function eventHandler( $event, $data ) {
+		switch ( $event ) {
+			case '':
+				// code...
+				break;
+		}
+		return;
 
 		if ( 'js' === $data['GET']['module'] ) {
 			$host = $server->webHost;
