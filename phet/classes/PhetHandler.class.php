@@ -1,6 +1,6 @@
 <?php
 
-final class PhetHandler {
+class PhetHandler {
 	public function __construct( $data ) {
 		if ( PHP_SAPI !== 'cli' )
 			throw new LogicException("phet should be run using CLI SAPI");
@@ -11,6 +11,7 @@ final class PhetHandler {
 		$this->data = $data;
 
 		$this->protocol = new PhetServer( $data['host'], $data['port'] );
+		$this->cache = new PhetCache();
 
 		$this->log( 'phet Handler initialized @ [' . $data['host'] . ':' . $data['port'] . ']' );
 
@@ -19,81 +20,171 @@ final class PhetHandler {
 
 	private $modules = array();
 	private $pid;
-	private $clients = array();
+	private $processes = array();
+	private $data = array();
 
-	protected function log( $message ) {
+	public function log( $message ) {
 		echo '[' . date('Y-m-d H:i:s') . '] ' . $message . "\n";
 	}
 
-	public function getClients() {
-		return $this->clients;
+	public function getInfo() {
+		return $this->data;
 	}
 
-	public function removeClient( $i ) {
-		unset( $this->clients[ $i ] );
-		$this->protocol->removeSocket( $i );
+	public function exit() {
+		foreach ( $this->processes as $pid )
+			posix_kill( $pid, SIGTERM );
+
+		$this->cache->close();
+		$this->server->disconnect();
+		exit();
+	}
+
+	public function cleanUpChild() {
+		unset( $this->processes );
 	}
 
 	public function serve() {
 		// Go daemon
-		// $this->daemonise();
+		$this->daemonise();
 		$this->registerSignalHandlers();
 
 		$this->log('phet is now listening...');
-		try {
-			while( $this->protocol->listen() ) {
-				$activeSockets = $this->protocol->getActiveSockets();
+		$this->createThread();
 
-				if ( isset( $activeSockets[0] ) ) {
-					$this->registerClient( $activeSockets[0] );
-					unset( $activeSockets[0] );
-				}
+		while( true ) {
+			pcntl_signal_dispatch();
 
-				foreach ( $activeSockets as $i => $socket ) {
-					$client = $this->clients[ $i - 1 ];
-
-					$input = $client->read();
-					$request = $this->
-				}
-
-				$this->protocol->cleanUp();
-				unset( $activeSockets, $i, $socket );
-			}
-		} catch ( Exception $error ) {
-			$this->protocol->disconnect();
-			$this->log( 'Exception: ' . $error->getMessage() );
+			usleep(300);
 		}
 	}
 
-	protected function registerClient( $socket ) {
-		if ( $this->data['maxClients'] <= count( $this->clients ) ) {
-			$this->log('Client rejected, maxClients reached.');
-			return;
+	private function daemonise() {
+		$pid = pcntl_fork();
+
+		if ( 0 > $pid )
+			throw new RuntimeException('Failed to fork parent');
+
+		else if ( 0 < $pid )
+			exit();
+
+		unset( $pid );
+		posix_setsid();
+		umask(0);
+		chdir('/');
+
+		$this->pid = posix_getpid();
+	}
+
+	private function createThread() {
+		for ( $i = 0; $i < $this->data['maxThreads']; $i++ )
+			if ( empty( $this->processes[ $i ] ) ) {
+				$this->processes[ $i ] = array(
+					'clients'	=>	0,
+					'pid'		=>	null
+				);
+
+				$thread = new PhetThread( $this, $i );
+				$thread = $thread->fork();
+			}
+
+		unset( $i, $thread );
+	}
+
+	public function registerProcess( $id, $childPid ) {
+		$this->processes[ $id ]['pid'] = $childPid;
+	}
+
+	private function registerSignalHandlers() {
+		pcntl_signal( SIGHUP, array( &$this, 'handleSignal' ) );
+		pcntl_signal( SIGTERM, array( &$this, 'handleSignal' ) );
+		pcntl_signal( SIGUSR1, array( &$this, 'handleSignal' ) );
+		pcntl_signal( SIGUSR2, array( &$this, 'handleSignal' ) );
+	}
+
+	private function handleSignal( $signal ) {
+		switch ( $signal ) {
+			case SIGHUP:
+			case SIGTERM:
+				$this->exit();
+
+			case SIGCHLD:
+				$this->waitForSignal( array( &$this, 'handleChildExit' ) );
+				break;
+
+			case SIGUSR1:
+				$this->handleClientConnect();
+				break;
+
+			case SIGUSR2:
+				$this->handleClientDisconnect();
+				break;
 		}
+	}
 
-		for ( $i = 0; $i < $this->data['maxClients']; $i++ ) {
-			if ( empty( $this->clients[ $i ] ) ) {
-				if ( false === ( $socket = socket_accept( $socket ) ) )
-					throw new RuntimeException( 'Failed to call socket_accept(). ' . socket_strerror( socket_last_error() ) );
+	private function waitForSignal( $callback ) {
+		while ( 0 < ( $pid = pcntl_waitpid( -1, $status ) ) )
+			if ( isset( $callback ) && is_callable( $callback ) )
+				call_user_func( $callback, $pid );
+		unset( $pid );
+	}
 
-				$this->log('Client #' . $i . ' connected.');
-				$this->clients[ $i ] = new PhetClient( $socket );
-				$this->clients[ $i ]->id = $i;
-
-				$this->protocol->addSocket( $socket, $i );
-
-				unset( $socket, $i );
+	private function handleChildExit( $childPid ) {
+		foreach ( $this->processes as $i => $process )
+			if ( $childPid === $process['pid'] ) {
+				unset( $this->processes[ $i ] );
 				break;
 			}
-		}
 	}
 
-	public function registerModule() {
-		// Register module
+	private function handleClientConnect() {
+		$this->processes[ $this->currentListeningProcess ]['clients']++;
+
+		if ( $this->data['maxThreadClients'] <= $this->processes[ $this->currentListeningProcess ]['clients'] )
+			if ( $this->data['maxThreads'] > count( $this->processes ) ) {
+				foreach ( $this->processes as $process ) {
+					if ( $this->data['maxThreadClients'] > $process['clients'] ) {
+						$this->switchListeningProcess( $process );
+						unset( $process );
+						return;
+					}
+				}
+
+				$this->createThread();
+				unset( $process );
+			} else
+				$this->log('Maximum threads reached.');
 	}
 
-	public function sendEvent() {
+	private function switchListeningProcess( $process ) {
 		// code...
+	}
+
+	private function handleClientDisconnect() {
+		$processes = $this->cache->get( 'calledDisconnect', array() );
+
+		foreach ( $processes as $i )
+			if ( isset( $this->processes[ $i ] ) )
+				$this->processes[ $i ]['clients']--;
+
+		$this->cache->set( 'calledDisconnect', array() );
+		unset( $processes, $i );
+	}
+
+	public function registerModule( &$module ) {
+		if ( is_object( $module ) && is_callable( $module ) )
+			$this->modules[] = &$module;
+		else
+			throw new Exception('Failed to register an invalid module.');
+
+		unset( $module );
+	}
+
+	public function sendEvent( $event, $data ) {
+		foreach ( $this->modules as $module )
+			$module( $event, $data );
+
+		unset( $module );
 	}
 }
 

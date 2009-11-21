@@ -1,9 +1,6 @@
 <?php
 
 class PhetServer {
-	public $host;
-	public $port;
-
 	private $socket;
 	private $sockets = array();
 	private $activeSockets;
@@ -16,7 +13,7 @@ class PhetServer {
 
 		socket_set_option( $this->socket, SOL_SOCKET, SO_REUSEADDR, 1 );
 		socket_listen( $this->socket );
-		socket_set_block( $this->socket );
+		socket_set_nonblock( $this->socket );
 
 		$this->sockets[0] = $this->socket;
 	}
@@ -40,9 +37,11 @@ class PhetServer {
 	public function listen() {
 		$null = null;
 		$this->activeSockets = $this->sockets;
-		$count = socket_select( $this->activeSockets, $null, $null, $null );
+		$count = socket_select( $this->activeSockets, $null, $null, 0 );
 
-		if ( 0 < $count ) {
+		if ( 0 === $count )
+			usleep(300);
+		else if ( 0 < $count ) {
 			unset( $null, $count );
 			return true;
 		} else
@@ -57,7 +56,7 @@ class PhetServer {
 		$this->cleanUp();
 
 		socket_shutdown( $this->socket, 1 );
-		usleep( 100 );
+		usleep(100);
 		socket_shutdown( $this->socket, 0 );
 		socket_close( $this->socket );
 	}

@@ -1,9 +1,9 @@
 <?php
 
 abstract class Thread {
-	abstract protected function handleParent( $pid );
+	abstract private function handleParent( $childPid );
 	
-	abstract protected function handleChild();
+	abstract private function handleChild( $parentPid );
 
 	public function fork() {
 		$parentPid = posix_getpid();
@@ -21,7 +21,8 @@ abstract class Thread {
 			exit();
 		}
 
-		unset( $parentPid, $pid );
+		unset( $parentPid );
+		return $pid;
 	}
 }
 
