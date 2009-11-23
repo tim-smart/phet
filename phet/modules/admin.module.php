@@ -1,54 +1,54 @@
 <?php
 
+define( 'PHET_ADMIN_USER', 'admin' );
+define( 'PHET_ADMIN_PASSWORD', 'password' );
+
 /*
  * PhetModuleAdmin class: The admin module for phet server
  * phet
  */
 
-class PhetModuleAdmin {
-	// Called by the server
-	public function run( $data, &$client, &$server ) {
-		if ( false === empty( $data['HEAD'] ) )
+class PhetModuleAdmin extends PhetModule {
+	public function __invoke( $event, $data ) {
+		if ( $event !== 'RequestRaw' )
 			return;
 
-		$input = trim( $data['raw'] );
-
-		if ( true !== $client->get('admin') ) {
-			if ( preg_match( '/login:(.*?)\|(.*)/', $input, $match ) ) {
+		if ( false === $data['client']->get( 'admin', false ) ) {
+			if ( preg_match( '/login:(.*?)\|(.*)/', $data['request']->getBody(), $match ) ) {
 				if ( PHET_ADMIN_USER === $match[1] && PHET_ADMIN_PASSWORD === $match[2] ) {
-					$client->set( 'admin', true );
-					$client->send('You are now logged in as admin' . "\n");
+					$data['client']->set( 'admin', true );
+					$data['client']->write('You are now logged in as ' . PHET_ADMIN_USER . "\n");
 				} else {
-					$this->disconnect( $client, $server );
-					return;
+					$data['client']->write('You need to login first' . "\n");
+					$this->thread->disconnectClient( $data['client'] );
 				}
+
 			} else {
-				$this->disconnect( $client, $server );
-				return;
+				$data['client']->write('You need to login first' . "\n");
+				$this->thread->disconnectClient( $data['client'] );
 			}
+
+			unset( $match );
+			return;
 		}
 
-		// The commands
-		switch ( $input ) {
+		switch ( $data['request']->getBody() ) {
 			case 'exit':
-				$server->disconnectClient( $client );
-				break;
+				$this->thread->disconnectClient( $data['client'] );
+				return;
 
 			case 'kill':
-				$server->stop();
-				break;
+				$this->shutdown();
+				return;
 		}
 
 		// Send a message to other clients
-		if ( preg_match( '/send:(.*)/', $input, $match ) )
-			$server->send( $match[1] . "\n" );
+		if ( preg_match( '/send:(.*)/', $data['request']->getBody(), $match ) )
+			$this->thread->sendGlobalBuffer( $match[1] . "\n" );
+		else if ( preg_match( '/kick:(.*)/', $data['request']->getBody(), $match ) )
+			$this->thread->disconnectClient( (int)$match[1] );
 
-		unset( $input, $match );
-	}
-
-	private function disconnect( &$client, &$server ) {
-		$client->send('Not authorised to do that silly!' . "\n");
-		$server->disconnectClient( $client );
+		unset( $match );
 	}
 }
 

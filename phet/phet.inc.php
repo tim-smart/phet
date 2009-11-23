@@ -12,6 +12,7 @@ require 'classes/PhetClient.class.php';
 require 'classes/PhetRequest.class.php';
 require 'classes/PhetRequestGet.class.php';
 require 'classes/PhetRequestRaw.class.php';
+require 'classes/PhetModule.class.php';
 
 // phet is a instance of PhetHandler
 $phet = new PhetHandler( array(

@@ -24,12 +24,34 @@ class PhetClient {
 
 		socket_set_nonblock( $this->socket );
 
-		$this->handler->sendEvent( 'ClientConnect', $this->thread, $this );
+		$this->handler->sendEvent( 'ClientConnect', $this );
 		$this->log('Connected');
 	}
 
 	public function log( $message ) {
 		$this->thread->log('Client #' . $this->id . ': ' . $message );
+	}
+
+	public function get( $key, $default = null ) {
+		$clients = $this->handler->cache->get( 'clients', array() );
+
+		if ( empty( $clients[ $this->id ]['data'][ $key ] ) )
+			$ret = $default;
+		else
+			$ret = $clients[ $this->id ]['data'][ $key ];
+
+		unset( $clients );
+		return $ret;
+	}
+
+	public function set( $key, $value ) {
+		$clients = $this->handler->cache->get( 'clients', array() );
+
+		$clients[ $this->id ]['data'][ $key ] = $value;
+		$this->handler->cache->set( 'clients', $clients );
+		unset( $clients );
+
+		return true;
 	}
 
 	public function read() {
@@ -70,7 +92,7 @@ class PhetClient {
 		socket_shutdown( $this->socket, 2 );
 		socket_close( $this->socket );
 
-		$this->handler->sendEvent( 'ClientDisconnect', $this->thread, $this );
+		$this->handler->sendEvent( 'ClientDisconnect', $this );
 		$this->log('Disconnected');
 	}
 }

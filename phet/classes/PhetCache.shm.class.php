@@ -21,14 +21,14 @@ class PhetCache {
 		'calledDisconnect'	=>	3
 	);
 
-	public function setLock() {
+	private function setLock() {
 		$this->semKey = sem_get( $this->ftokSemKey, 1, 0600 );
 		sem_acquire( $this->semKey );
 
 		$this->shmKey = shm_attach( $this->ftokShmKey );
 	}
 
-	public function releaseLock() {
+	private function releaseLock() {
 		shm_detach( $this->shmKey );
 		sem_release( $this->semKey );
 
@@ -39,16 +39,18 @@ class PhetCache {
 	public function get( $key, $default = NULL ) {
 		$this->setLock();
 
-		if ( shm_has_var( $this->shmKey, $this->keyMap[ $key ] ) )
-			return shm_get_var( $this->shmKey, $this->keyMap[ $key ] );
-		else
-			return $default;
+		if ( shm_has_var( $this->shmKey, $this->keyMap[ $key ] ) ) {
+			$ret = shm_get_var( $this->shmKey, $this->keyMap[ $key ] );
+			$this->releaseLock();
+			return $ret;
+		}
+
+		$this->releaseLock();
+		return $default;
 	}
 
 	public function set( $key, $value ) {
-		if ( null === $this->shmKey )
-			$this->setLock();
-
+		$this->setLock();
 		shm_put_var( $this->shmKey, $this->keyMap[ $key ], $value );
 		$this->releaseLock();
 	}

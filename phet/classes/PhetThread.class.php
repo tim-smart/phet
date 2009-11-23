@@ -16,7 +16,7 @@ class PhetThread extends Thread {
 		$this->handler->log( 'Process #' . $this->id . ': ' . $message );
 	}
 
-	public function shutdown() {
+	private function shutdown() {
 		$this->handler->protocol->stop();
 		$this->log('Disconnected');
 		exit();
@@ -42,7 +42,6 @@ class PhetThread extends Thread {
 	}
 
 	private function handleGlobalBuffer() {
-		$this->log('Handling');
 		$processes = $this->handler->cache->get( 'processes', array() );
 
 		if ( isset( $processes[ $this->id ] ) )
@@ -56,7 +55,7 @@ class PhetThread extends Thread {
 	}
 
 	private function writeGlobalBuffer( $data, $clientId = null ) {
-		if ( 0 <= count( $this->clients ) )
+		if ( 0 >= count( $this->clients ) )
 			return;
 
 		foreach ( $this->clients as $client )
@@ -68,7 +67,6 @@ class PhetThread extends Thread {
 
 	public function sendBatchBuffer( $data, $clients ) {
 		$cacheClients = $this->handler->cache->get( 'clients', array() );
-		$this->handler->cache->releaseLock();
 
 		$processes = array();
 		$localClients = array();
@@ -133,7 +131,6 @@ class PhetThread extends Thread {
 			$this->writeClientBuffer( $data, $clientId );
 		else {
 			$clients = $this->handler->cache->get( 'clients', array() );
-			$this->handler->cache->releaseLock();
 
 			if ( isset( $clients[ $clientId ] ) ) {
 				$processes = $this->handler->cache->get( 'processes', array() );
@@ -143,16 +140,12 @@ class PhetThread extends Thread {
 				);
 				$this->handler->cache->set( 'processes', $processes );
 
-				var_dump( $processes );
-
 				posix_kill( $processes[ $clients[ $clientId ]['process'] ]['pid'], 51 );
 
 				unset( $processes );
 			}
-
 			unset( $clients );
 		}
-
 		unset( $data );
 	}
 
@@ -170,6 +163,9 @@ class PhetThread extends Thread {
 	}
 
 	private function writeClientBuffer( $data, $clientId ) {
+		if ( false === $data )
+			$this->disconnectClient( $this->clients[ $clientId ] );
+
 		$this->clients[ $clientId ]->write( $data );
 	}
 
@@ -192,6 +188,7 @@ class PhetThread extends Thread {
 		unset( $processes );
 
 		$this->registerSignalHandlers();
+		$this->handler->initModules( $this );
 
 		$this->log('Started');
 		$this->waitForSignal();
@@ -242,7 +239,8 @@ class PhetThread extends Thread {
 	private function registerClient( $socket ) {
 		$clients = $this->handler->cache->get( 'clients', array() );
 		$clients[] = array(
-			'process'	=>	$this->id
+			'process'	=>	$this->id,
+			'data'		=>	array()
 		);
 		$this->handler->cache->set( 'clients', $clients );
 
@@ -275,35 +273,44 @@ class PhetThread extends Thread {
 		$request = PhetRequest::factory( $input );
 
 		if ( false === $request ) {
-			$client->disconnect();
-			$this->handler->protocol->removeSocket( $client->id );
-
-			$array = $this->handler->cache->get( 'calledDisconnect', array() );
-			$array[] = $this->id;
-			$this->handler->cache->set( 'calledDisconnect', $array );
-
-			posix_kill( $this->handler->pid, SIGUSR2 );
-			unset( $this->clients[ $client->id ], $array, $request );
-	
-			if ( 0 >= count( $this->handler->protocol->getSockets() ) )
-				$this->waitForSignal();
-
+			$this->disconnectClient( $client );
 			return;
 		}
 
 		switch ( $request->type ) {
 			case 'get':
-				$this->handler->sendEvent( 'RequestGet', $this, $client, $request );
+				$this->handler->sendEvent( 'RequestGet', $client, $request );
 				break;
 
 			case 'raw':
-				$this->handler->sendEvent( 'RequestRaw', $this, $client, $request );
+				$this->handler->sendEvent( 'RequestRaw', $client, $request );
 				break;
 		}
 
-		$this->sendBatchBuffer( $input, array( 1, 2 ) );
-
 		unset( $input, $request );
+	}
+
+	public function disconnectClient( $client ) {
+		if ( is_int( $client ) )
+			if ( isset( $this->clients[ $client ] ) )
+				$client = $this->clients[ $client ];
+			else {
+				$this->sendClientBuffer( false, $client );
+			}
+
+
+		$client->disconnect();
+		$this->handler->protocol->removeSocket( $client->id );
+
+		$array = $this->handler->cache->get( 'calledDisconnect', array() );
+		$array[] = $this->id;
+		$this->handler->cache->set( 'calledDisconnect', $array );
+
+		posix_kill( $this->handler->pid, SIGUSR2 );
+		unset( $this->clients[ $client->id ], $array, $request );
+
+		if ( 0 >= count( $this->handler->protocol->getSockets() ) )
+			$this->waitForSignal();
 	}
 
 	private function registerSignalHandlers() {

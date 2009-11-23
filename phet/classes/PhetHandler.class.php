@@ -28,7 +28,7 @@ class PhetHandler {
 		echo '[' . date('Y-m-d H:i:s') . '] ' . $message . "\n";
 	}
 
-	public function shutdown() {
+	private function shutdown() {
 		foreach ( $this->processes as $process )
 			posix_kill( $process['pid'], SIGTERM );
 		unset( $process );
@@ -183,18 +183,30 @@ class PhetHandler {
 		unset( $processes, $i, $process );
 	}
 
-	public function registerModule( &$module ) {
+	public function registerModule( $module ) {
 		if ( is_object( $module ) && is_callable( $module ) )
-			$this->modules[] = &$module;
+			$this->modules[] = $module;
 		else
 			throw new Exception('Failed to register an invalid module.');
 
 		unset( $module );
 	}
 
-	public function sendEvent( $event, $thread, $client = null, $data = null ) {
+	public function initModules( $thread ) {
+		foreach ( $this->modules as $module ) {
+			$module->handler = $this;
+			$module->thread = $thread;
+		}
+
+		unset( $module );
+	}
+
+	public function sendEvent( $event, $client = null, $data = null ) {
 		foreach ( $this->modules as $module )
-			$module( $event, $this, $thread, $client, $data );
+			$module( $event, array(
+				'client'	=>	$client,
+				'request'	=>	$data
+			) );
 
 		unset( $module );
 	}
