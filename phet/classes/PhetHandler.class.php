@@ -11,7 +11,7 @@ class PhetHandler {
 		$this->data = $data;
 
 		$this->protocol = new PhetServer( $data['host'], $data['port'] );
-		$this->cache = new PhetCache();
+		$this->cache = new PhetCache( $data['cache_host'], $data['cache_port'] );
 
 		$this->log( 'phet Handler initialized @ [' . $data['host'] . ':' . $data['port'] . ']' );
 
@@ -19,24 +19,23 @@ class PhetHandler {
 	}
 
 	private $modules = array();
-	private $pid;
+	public $pid;
 	private $processes = array();
-	private $data = array();
+	public $data = array();
+	private $currentListeningProcess;
 
 	public function log( $message ) {
 		echo '[' . date('Y-m-d H:i:s') . '] ' . $message . "\n";
 	}
 
-	public function getInfo() {
-		return $this->data;
-	}
-
-	public function exit() {
-		foreach ( $this->processes as $pid )
-			posix_kill( $pid, SIGTERM );
+	public function shutdown() {
+		foreach ( $this->processes as $process )
+			posix_kill( $process['pid'], SIGTERM );
+		unset( $process );
 
 		$this->cache->close();
-		$this->server->disconnect();
+		$this->protocol->disconnect();
+		$this->log('Disconnected');
 		exit();
 	}
 
@@ -47,15 +46,19 @@ class PhetHandler {
 	public function serve() {
 		// Go daemon
 		$this->daemonise();
-		$this->registerSignalHandlers();
 
-		$this->log('phet is now listening...');
-		$this->createThread();
+		for ( $i = 0; $i < $this->data['threads']; $i++ )
+			$this->createThread();
+
+		posix_kill( $this->processes[0]['pid'], SIGUSR1 );
+		$this->currentListeningProcess = 0;
+
+		$this->registerSignalHandlers();
 
 		while( true ) {
 			pcntl_signal_dispatch();
 
-			usleep(300);
+			usleep(500);
 		}
 	}
 
@@ -77,7 +80,7 @@ class PhetHandler {
 	}
 
 	private function createThread() {
-		for ( $i = 0; $i < $this->data['maxThreads']; $i++ )
+		for ( $i = 0; $i < $this->data['threads']; $i++ )
 			if ( empty( $this->processes[ $i ] ) ) {
 				$this->processes[ $i ] = array(
 					'clients'	=>	0,
@@ -86,6 +89,7 @@ class PhetHandler {
 
 				$thread = new PhetThread( $this, $i );
 				$thread = $thread->fork();
+				break;
 			}
 
 		unset( $i, $thread );
@@ -93,11 +97,13 @@ class PhetHandler {
 
 	public function registerProcess( $id, $childPid ) {
 		$this->processes[ $id ]['pid'] = $childPid;
+		$this->currentListeningProcess = $id;
 	}
 
 	private function registerSignalHandlers() {
 		pcntl_signal( SIGHUP, array( &$this, 'handleSignal' ) );
 		pcntl_signal( SIGTERM, array( &$this, 'handleSignal' ) );
+		pcntl_signal( SIGCHLD, array( &$this, 'handleSignal' ) );
 		pcntl_signal( SIGUSR1, array( &$this, 'handleSignal' ) );
 		pcntl_signal( SIGUSR2, array( &$this, 'handleSignal' ) );
 	}
@@ -106,7 +112,7 @@ class PhetHandler {
 		switch ( $signal ) {
 			case SIGHUP:
 			case SIGTERM:
-				$this->exit();
+				$this->shutdown();
 
 			case SIGCHLD:
 				$this->waitForSignal( array( &$this, 'handleChildExit' ) );
@@ -140,24 +146,21 @@ class PhetHandler {
 	private function handleClientConnect() {
 		$this->processes[ $this->currentListeningProcess ]['clients']++;
 
-		if ( $this->data['maxThreadClients'] <= $this->processes[ $this->currentListeningProcess ]['clients'] )
-			if ( $this->data['maxThreads'] > count( $this->processes ) ) {
-				foreach ( $this->processes as $process ) {
-					if ( $this->data['maxThreadClients'] > $process['clients'] ) {
-						$this->switchListeningProcess( $process );
-						unset( $process );
-						return;
-					}
+		if ( $this->data['maxThreadClients'] <= $this->processes[ $this->currentListeningProcess ]['clients'] ) {
+			foreach ( $this->processes as $i => $process ) {
+				if ( $this->data['maxThreadClients'] > $process['clients'] ) {
+					posix_kill( $process['pid'], SIGUSR1 );
+					$this->currentListeningProcess = $i;
+					unset( $process, $i );
+					return;
 				}
+			}
 
-				$this->createThread();
-				unset( $process );
-			} else
-				$this->log('Maximum threads reached.');
-	}
+			$this->currentListeningProcess = false;
+			$this->log('Maximum capacity reached.');
 
-	private function switchListeningProcess( $process ) {
-		// code...
+			unset( $process );
+		}
 	}
 
 	private function handleClientDisconnect() {
@@ -168,7 +171,16 @@ class PhetHandler {
 				$this->processes[ $i ]['clients']--;
 
 		$this->cache->set( 'calledDisconnect', array() );
-		unset( $processes, $i );
+
+		if ( false === $this->currentListeningProcess ) {
+			foreach ( $this->processes as $i => $process )
+				if ( $this->data['maxThreadClients'] > $process['clients'] ) {
+					posix_kill( $process['pid'], SIGUSR1 );
+					$this->currentListeningProcess = $i;
+					break;
+				}
+		}
+		unset( $processes, $i, $process );
 	}
 
 	public function registerModule( &$module ) {
@@ -180,9 +192,9 @@ class PhetHandler {
 		unset( $module );
 	}
 
-	public function sendEvent( $event, $data ) {
+	public function sendEvent( $event, $thread, $client = null, $data = null ) {
 		foreach ( $this->modules as $module )
-			$module( $event, $data );
+			$module( $event, $this, $thread, $client, $data );
 
 		unset( $module );
 	}

@@ -9,18 +9,30 @@
  */
 
 class PhetClient {
+	public $id;
 	private $socket;
 	private $handle;
 	private $request;
-	public $info = array();
+	private $thread;
+	private $handler;
 
-	function __construct( &$socket ) {
+	function __construct( $handler, $thread, &$socket, $id ) {
 		$this->socket = &$socket;
+		$this->thread = $thread;
+		$this->handler = $handler;
+		$this->id = $id;
+
+		socket_set_nonblock( $this->socket );
+
+		$this->handler->sendEvent( 'ClientConnect', $this->thread, $this );
+		$this->log('Connected');
+	}
+
+	public function log( $message ) {
+		$this->thread->log('Client #' . $this->id . ': ' . $message );
 	}
 
 	public function read() {
-		socket_set_nonblock( $this->socket );
-
 		$buffer = NULL;
 		$input = '';
 
@@ -30,16 +42,36 @@ class PhetClient {
 			if ( false === $buffer || '' === $buffer )
 				break;
 
-			$input = $input . $buffer;
+			$input .= $buffer;
 		}
 		unset( $buffer );
 
+		$this->log('Request recieved');
 		return $input;
+	}
+
+	public function write( $body ) {
+		$sent = 0;
+		$length = strlen( $body );
+		while ( $length > $sent ) {
+			$success = @socket_write( $this->socket, substr( $body, $sent ), $length - $sent );
+
+			if ( false !== $success )
+				$sent += $success;
+			else {
+				$this->log( 'Error writing data: ' . socket_strerror( socket_last_error() ) );
+				break;
+			}
+		}
+		unset( $sent, $length, $success );
 	}
 
 	public function disconnect() {
 		socket_shutdown( $this->socket, 2 );
 		socket_close( $this->socket );
+
+		$this->handler->sendEvent( 'ClientDisconnect', $this->thread, $this );
+		$this->log('Disconnected');
 	}
 }
 
