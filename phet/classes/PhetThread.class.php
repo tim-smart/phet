@@ -303,7 +303,10 @@ class PhetThread extends Thread {
 		$this->handler->protocol->removeSocket( $client->id );
 
 		$array = $this->handler->cache->get( 'calledDisconnect', array() );
-		$array[] = $this->id;
+		$array[] = array(
+			'id'		=>	$this->id,
+			'clients'	=>	count( $this->clients )
+		);
 		$this->handler->cache->set( 'calledDisconnect', $array );
 
 		posix_kill( $this->handler->pid, SIGUSR2 );

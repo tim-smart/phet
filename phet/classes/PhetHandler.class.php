@@ -166,9 +166,9 @@ class PhetHandler {
 	private function handleClientDisconnect() {
 		$processes = $this->cache->get( 'calledDisconnect', array() );
 
-		foreach ( $processes as $i )
-			if ( isset( $this->processes[ $i ] ) )
-				$this->processes[ $i ]['clients']--;
+		foreach ( $processes as $process )
+			if ( isset( $this->processes[ $process['id'] ] ) )
+				$this->processes[ $process['id'] ]['clients'] = $process['clients'];
 
 		$this->cache->set( 'calledDisconnect', array() );
 
@@ -183,7 +183,7 @@ class PhetHandler {
 		unset( $processes, $i, $process );
 	}
 
-	public function registerModule( $module ) {
+	public function registerStaticModule( $module ) {
 		if ( is_object( $module ) && is_callable( $module ) )
 			$this->modules[] = $module;
 		else
