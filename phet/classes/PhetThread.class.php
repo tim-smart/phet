@@ -296,6 +296,7 @@ class PhetThread extends Thread {
 				$client = $this->clients[ $client ];
 			else {
 				$this->sendClientBuffer( false, $client );
+				return;
 			}
 
 
