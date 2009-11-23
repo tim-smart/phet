@@ -183,7 +183,7 @@ class PhetHandler {
 		unset( $processes, $i, $process );
 	}
 
-	public function registerStaticModule( $module ) {
+	public function registerModule( $module ) {
 		if ( is_object( $module ) && is_callable( $module ) )
 			$this->modules[] = $module;
 		else
