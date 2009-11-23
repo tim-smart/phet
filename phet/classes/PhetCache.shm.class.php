@@ -20,6 +20,12 @@ class PhetCache {
 		'clients'			=>	2,
 		'calledDisconnect'	=>	3
 	);
+	private $keyCounter = 4;
+
+	public function registerCacheKey( $key ) {
+		$this->keyMap[ $key ] = $this->keyCounter;
+		$this->keyCounter++;
+	}
 
 	private function setLock() {
 		$this->semKey = sem_get( $this->ftokSemKey, 1, 0600 );
