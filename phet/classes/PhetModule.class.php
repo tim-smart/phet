@@ -4,8 +4,8 @@ abstract class PhetModule {
 	public $handler;
 	public $thread;
 
-	protected function getClients( $handler ) {
-		return $handler->cache->get( 'clients', array() );
+	protected function getClients() {
+		return $this->handler->cache->get( 'clients', array() );
 	}
 
 	protected function shutdown() {

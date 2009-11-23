@@ -89,7 +89,6 @@ class PhetClient {
 	}
 
 	public function disconnect() {
-		socket_shutdown( $this->socket, 2 );
 		socket_close( $this->socket );
 
 		$this->handler->sendEvent( 'ClientDisconnect', $this );

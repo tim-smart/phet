@@ -309,8 +309,13 @@ class PhetThread extends Thread {
 		);
 		$this->handler->cache->set( 'calledDisconnect', $array );
 
+		$clients = $this->handler->cache->get( 'clients', array() );
+		unset( $clients[ $client->id ] );
+		$this->handler->cache->set( 'clients', $clients );
+
+		unset( $clients, $this->clients[ $client->id ], $array, $request );
+
 		posix_kill( $this->handler->pid, SIGUSR2 );
-		unset( $this->clients[ $client->id ], $array, $request );
 
 		if ( 0 >= count( $this->handler->protocol->getSockets() ) )
 			$this->waitForSignal();
@@ -327,7 +332,6 @@ class PhetThread extends Thread {
 
 	public function handleSignal( $signal ) {
 		switch ( $signal ) {
-			case SIGHUP:
 			case SIGTERM:
 				$this->shutdown();
 

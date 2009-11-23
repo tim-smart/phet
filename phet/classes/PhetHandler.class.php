@@ -25,13 +25,15 @@ class PhetHandler {
 	private $currentListeningProcess;
 
 	public function log( $message ) {
-		echo '[' . date('Y-m-d H:i:s') . '] ' . $message . "\n";
+		//echo '[' . date('Y-m-d H:i:s') . '] ' . $message . "\n";
 	}
 
 	private function shutdown() {
 		foreach ( $this->processes as $process )
 			posix_kill( $process['pid'], SIGTERM );
 		unset( $process );
+
+		$this->sendEvent( 'ProtocolDisconnect' );
 
 		$this->cache->close();
 		$this->protocol->disconnect();
@@ -54,6 +56,9 @@ class PhetHandler {
 		$this->currentListeningProcess = 0;
 
 		$this->registerSignalHandlers();
+		$this->initModules( null );
+
+		$this->sendEvent( 'ProtocolConnect' );
 
 		while( true ) {
 			pcntl_signal_dispatch();
@@ -110,7 +115,6 @@ class PhetHandler {
 
 	private function handleSignal( $signal ) {
 		switch ( $signal ) {
-			case SIGHUP:
 			case SIGTERM:
 				$this->shutdown();
 

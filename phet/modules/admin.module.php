@@ -40,6 +40,10 @@ class PhetModuleAdmin extends PhetModule {
 			case 'kill':
 				$this->shutdown();
 				return;
+
+			case 'clients':
+				$data['client']->write( var_export( $this->getClients(), true ) . "\n" );
+				return;
 		}
 
 		// Send a message to other clients

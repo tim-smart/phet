@@ -26,7 +26,8 @@ class PhetModuleComet extends PhetModule {
 				'Transfer-Encoding: chunked' . "\r\n\r\n" );
 
 			unset( $body );
-		}
+		} else if ( 'bench' === $module )
+			$this->thread->disconnectClient( $data['client'] );
 	}
 }
 
