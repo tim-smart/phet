@@ -4,11 +4,11 @@ abstract class PhetModule {
 	public $handler;
 	public $thread;
 
-	protected function getClients() {
+	public function getClients() {
 		return $this->handler->cache->get( 'clients', array() );
 	}
 
-	protected function shutdown() {
+	public function shutdown() {
 		posix_kill( $this->handler->pid, SIGTERM );
 	}
 }
